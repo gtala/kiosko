@@ -1,0 +1,6 @@
+@KioskoMicroservice_HostAddress = http://localhost:5113
+
+GET {{KioskoMicroservice_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
