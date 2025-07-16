@@ -4,6 +4,7 @@ using KioskoMicroservice.Services;
 using KioskoMicroservice.Models;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 
 namespace KioskoMicroservice.Controllers
 {
@@ -284,11 +285,26 @@ namespace KioskoMicroservice.Controllers
                     });
                 }
 
+                // Parsear la respuesta JSON para devolver un objeto limpio
+                var userData = System.Text.Json.JsonSerializer.Deserialize<JsonElement>(responseContent);
+                
+                // Extraer solo la información relevante
+                var cleanUserData = new
+                {
+                    id = userData.TryGetProperty("id", out var id) ? id.GetInt32() : 0,
+                    nickname = userData.TryGetProperty("nickname", out var nickname) ? nickname.GetString() : "",
+                    first_name = userData.TryGetProperty("first_name", out var firstName) ? firstName.GetString() : "",
+                    last_name = userData.TryGetProperty("last_name", out var lastName) ? lastName.GetString() : "",
+                    email = userData.TryGetProperty("email", out var email) ? email.GetString() : "",
+                    country_id = userData.TryGetProperty("country_id", out var countryId) ? countryId.GetString() : "",
+                    site_id = userData.TryGetProperty("site_id", out var siteId) ? siteId.GetString() : ""
+                };
+
                 return Ok(new { 
                     success = true,
                     message = "Token válido",
                     status = response.StatusCode,
-                    response = responseContent
+                    user = cleanUserData
                 });
             }
             catch (Exception ex)
@@ -338,12 +354,23 @@ namespace KioskoMicroservice.Controllers
                     });
                 }
 
+                // Parsear la respuesta JSON para devolver un objeto limpio
+                var productsData = System.Text.Json.JsonSerializer.Deserialize<JsonElement>(responseContent);
+                
+                // Extraer solo la información relevante
+                var cleanProductsData = new
+                {
+                    seller_id = productsData.TryGetProperty("seller_id", out var sellerId) ? sellerId.GetString() : "",
+                    total = productsData.TryGetProperty("paging", out var paging) && paging.TryGetProperty("total", out var total) ? total.GetInt32() : 0,
+                    results = productsData.TryGetProperty("results", out var results) ? results.EnumerateArray().Select(r => r.GetString()).ToArray() : new string[0]
+                };
+
                 return Ok(new { 
                     success = true,
                     message = "Productos obtenidos correctamente",
                     userId = user.Id,
                     status = response.StatusCode,
-                    response = responseContent
+                    products = cleanProductsData
                 });
             }
             catch (Exception ex)
