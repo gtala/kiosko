@@ -12,6 +12,13 @@ namespace KioskoMicroservice.Services
         Task<UserProductsResponse> GetUserProductsWithTokenAsync(string accessToken);
 
         /// <summary>
+        /// Obtiene los productos detallados de un usuario de MercadoLibre usando token de acceso
+        /// </summary>
+        /// <param name="accessToken">Token de acceso</param>
+        /// <returns>Lista de productos detallados del usuario</returns>
+        Task<ProductDetailsResponse> GetUserProductDetailsWithTokenAsync(string accessToken);
+
+        /// <summary>
         /// Obtiene los productos de un usuario de MercadoLibre (simulado para desarrollo)
         /// </summary>
         /// <param name="userId">ID del usuario</param>

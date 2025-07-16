@@ -94,6 +94,81 @@ namespace KioskoMicroservice.Services
         }
 
         /// <summary>
+        /// Obtiene los productos detallados de un usuario de MercadoLibre usando token de acceso
+        /// </summary>
+        /// <param name="accessToken">Token de acceso</param>
+        /// <returns>Lista de productos detallados del usuario</returns>
+        public async Task<ProductDetailsResponse> GetUserProductDetailsWithTokenAsync(string accessToken)
+        {
+            try
+            {
+                _logger.LogInformation("Obteniendo productos detallados usando token de acceso");
+
+                // Primero obtener información del usuario
+                var user = await GetUserWithTokenAsync(accessToken);
+                
+                // Obtener productos del usuario usando el user ID
+                var request = new HttpRequestMessage(HttpMethod.Get, $"https://api.mercadolibre.com/users/{user.Id}/items/search");
+                request.Headers.Add("Authorization", $"Bearer {accessToken}");
+                
+                var response = await _httpClient.SendAsync(request);
+                var responseContent = await response.Content.ReadAsStringAsync();
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    _logger.LogError("Error obteniendo productos. Status: {Status}, Response: {Response}", 
+                        response.StatusCode, responseContent);
+                    throw new Exception($"Error obteniendo productos: {response.StatusCode}");
+                }
+
+                var searchResponse = JsonSerializer.Deserialize<JsonElement>(responseContent);
+                
+                // Obtener los IDs de los productos
+                var itemIds = new List<string>();
+                if (searchResponse.TryGetProperty("results", out var results))
+                {
+                    foreach (var item in results.EnumerateArray())
+                    {
+                        // Los resultados son strings (IDs), no objetos
+                        itemIds.Add(item.GetString() ?? "");
+                    }
+                }
+
+                _logger.LogInformation("Encontrados {Count} productos", itemIds.Count);
+
+                // Obtener detalles completos de cada producto
+                var products = new List<ProductDetail>();
+                foreach (var itemId in itemIds.Take(10)) // Limitar a 10 productos para evitar rate limiting
+                {
+                    try
+                    {
+                        var product = await GetProductDetailAsync(itemId, accessToken);
+                        if (product != null)
+                        {
+                            products.Add(product);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Error obteniendo detalles del producto {ItemId}", itemId);
+                    }
+                }
+
+                return new ProductDetailsResponse
+                {
+                    UserId = user.Id.ToString(),
+                    Products = products,
+                    TotalProducts = products.Count
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error obteniendo productos detallados con token");
+                throw;
+            }
+        }
+
+        /// <summary>
         /// Obtiene los productos de un usuario de MercadoLibre (simulado para desarrollo)
         /// </summary>
         /// <param name="userId">ID del usuario</param>
@@ -269,6 +344,50 @@ namespace KioskoMicroservice.Services
                     Pictures = pictures,
                     Permalink = itemData.TryGetProperty("permalink", out var permalink) ? permalink.GetString() ?? "" : ""
                 };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Error obteniendo detalles del producto {ItemId}", itemId);
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Obtiene detalles completos de un producto específico
+        /// </summary>
+        /// <param name="itemId">ID del producto</param>
+        /// <param name="accessToken">Token de acceso</param>
+        /// <returns>Detalles completos del producto</returns>
+        private async Task<ProductDetail?> GetProductDetailAsync(string itemId, string accessToken)
+        {
+            try
+            {
+                var request = new HttpRequestMessage(HttpMethod.Get, $"https://api.mercadolibre.com/items/{itemId}");
+                request.Headers.Add("Authorization", $"Bearer {accessToken}");
+                
+                var response = await _httpClient.SendAsync(request);
+                var responseContent = await response.Content.ReadAsStringAsync();
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    _logger.LogWarning("Error obteniendo detalles del producto {ItemId}. Status: {Status}", 
+                        itemId, response.StatusCode);
+                    return null;
+                }
+
+                // Deserializar directamente usando el modelo con JsonPropertyName
+                var product = JsonSerializer.Deserialize<ProductDetail>(responseContent);
+                
+                if (product == null)
+                {
+                    _logger.LogWarning("No se pudo deserializar el producto {ItemId}", itemId);
+                    return null;
+                }
+
+                _logger.LogInformation("Producto detallado obtenido exitosamente: {ItemId} - {Title}", 
+                    product.Id, product.Title);
+                
+                return product;
             }
             catch (Exception ex)
             {

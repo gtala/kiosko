@@ -84,6 +84,34 @@ namespace KioskoMicroservice.Controllers
         }
 
         /// <summary>
+        /// Obtiene todos los productos detallados de un usuario de MercadoLibre usando token de acceso
+        /// </summary>
+        /// <param name="accessToken">Token de acceso</param>
+        /// <returns>Lista de productos detallados del usuario</returns>
+        [HttpGet("products/detailed/with-token")]
+        public async Task<ActionResult<ProductDetailsResponse>> GetUserProductDetailsWithToken([FromQuery] string accessToken)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(accessToken))
+                {
+                    return BadRequest("El token de acceso es requerido");
+                }
+
+                _logger.LogInformation("Obteniendo productos detallados usando token de acceso");
+                
+                var result = await _mercadoLibreService.GetUserProductDetailsWithTokenAsync(accessToken);
+                
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error obteniendo productos detallados con token");
+                return StatusCode(500, new { error = "Error interno del servidor", message = ex.Message });
+            }
+        }
+
+        /// <summary>
         /// Obtiene información del usuario usando token de acceso
         /// </summary>
         /// <param name="accessToken">Token de acceso</param>
